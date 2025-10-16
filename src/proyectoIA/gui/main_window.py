@@ -1,4 +1,7 @@
 import sys
+from ..algorithms.beam_search import beam_search
+from ..algorithms.dynamic import dynamic_weighting_search
+
 from .mapa import (
     load_map,
     CellTypes,
@@ -67,11 +70,13 @@ class GridWidget(QWidget):
 
         # Boton iniciar Beam Search
         self.btn_beam = QPushButton("Iniciar Beam Search")
-        #self.btn_beam.clicked.connect(self.iniciar_beam)
+        self.btn_beam.clicked.connect(self.iniciar_beam)
 
         # Boton iniciar Dynamic Weighting
         self.btn_dw = QPushButton("Iniciar Dynamic Weighting")
-        #self.btn_dw.clicked.connect(self.iniciar_dw)
+        self.btn_dw.clicked.connect(self.iniciar_dw)
+
+        
 
         # Boton resetear mapa
         self.reiniciar_todo = QPushButton("Reiniciar")
@@ -124,6 +129,18 @@ class GridWidget(QWidget):
         self.rows, self.cols, self.grid_data = load_map()
         self.temp_grid_data = self.grid_data.copy()
         self.redraw_grid()
+
+    def iniciar_beam(self):
+        inicio, meta, obstaculos = self.extraer_datos_mapa()
+        camino = beam_search(self.rows, inicio, meta, obstaculos)
+        if camino:
+            self.animar_camino(camino)
+            
+    def iniciar_dw(self):
+        inicio, meta, obstaculos = self.extraer_datos_mapa()
+        camino = dynamic_weighting_search(self.rows, inicio, meta, obstaculos)
+        if camino:
+            self.animar_camino(camino)
 
 
 class MainWindow(QMainWindow):
