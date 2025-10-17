@@ -18,11 +18,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QGraphicsRectItem,
     QPushButton,
+    QGraphicsTextItem,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QWheelEvent,
     QBrush,
+    QFont,
 )
 
 # Clase para crear un mapa zoomable
@@ -63,8 +65,8 @@ class GridWidget(QWidget):
         self.timer_animacion.timeout.connect(self.actualizar_animacion)
         self.velocidad_animacion = 300 
 
-
-        #TODO: Animacion para mostrar los movimientos de la hormiga
+        self.ant_item = None
+        self.mushroom_item = None
 
         # Cargar mapa inicial
         self.rows, self.cols, self.grid_data = load_map()
@@ -117,9 +119,11 @@ class GridWidget(QWidget):
     def set_grid_size(self, size):
         self.rows, self.cols = size
 
-    # Se encarga de actualizar el mapa
     def redraw_grid(self):
         self.scene.clear()
+        self.ant_item = None
+        self.mushroom_item = None
+        
         width = self.cols * self.cell_size
         height = self.rows * self.cell_size
         self.scene.setSceneRect(0, 0, width, height)
@@ -132,6 +136,31 @@ class GridWidget(QWidget):
                 rect = QGraphicsRectItem(col * self.cell_size, row * self.cell_size, self.cell_size, self.cell_size)
                 rect.setBrush(QBrush(color))
                 self.scene.addItem(rect)
+                
+                if cell_type == CellTypes.ANT:
+                    self.ant_item = QGraphicsTextItem("🐜")
+                    font = QFont()
+                    font.setPointSize(int(self.cell_size * 0.8))
+                    self.ant_item.setFont(font)
+                    # Center the emoji in the cell
+                    self.ant_item.setPos(
+                        col * self.cell_size + self.cell_size * 0.1,
+                        row * self.cell_size - self.cell_size * 0.2
+                    )
+                    self.scene.addItem(self.ant_item)
+                
+                elif cell_type == CellTypes.OBJECTIVE:
+                    self.mushroom_item = QGraphicsTextItem("🍄")
+                    font = QFont()
+                    font.setPointSize(int(self.cell_size * 0.8))
+                    self.mushroom_item.setFont(font)
+                    # Center the emoji in the cell
+                    self.mushroom_item.setPos(
+                        col * self.cell_size + self.cell_size * 0.1,
+                        row * self.cell_size - self.cell_size * 0.2
+                    )
+                    self.mushroom_item.setZValue(1)
+                    self.scene.addItem(self.mushroom_item)
 
     # Funcion para reiniciar el mapa
     def reiniciar(self):
@@ -211,10 +240,24 @@ class GridWidget(QWidget):
         # Restaurar mapa original (quitar hormiga de posición inicial)
         self.temp_grid_data = self.grid_data.copy()
         
-        # Quitar la hormiga de su posición inicial en temp_grid_data
         for pos, cell_type in list(self.temp_grid_data.items()):
             if cell_type == CellTypes.ANT:
                 self.temp_grid_data[pos] = CellTypes.EMPTY
+        
+        self.redraw_grid()
+        
+        if len(camino) > 0:
+            start_pos = camino[0]
+            self.ant_item = QGraphicsTextItem("🐜")
+            font = QFont()
+            font.setPointSize(int(self.cell_size * 0.8))
+            self.ant_item.setFont(font)
+            self.ant_item.setPos(
+                start_pos[1] * self.cell_size + self.cell_size * 0.1,
+                start_pos[0] * self.cell_size - self.cell_size * 0.2
+            )
+            self.ant_item.setZValue(1)
+            self.scene.addItem(self.ant_item)
         
         # Iniciar animación
         self.timer_animacion.start(self.velocidad_animacion)
@@ -232,19 +275,23 @@ class GridWidget(QWidget):
         # Obtener posición actual del camino
         posicion_actual = self.camino_actual[self.indice_animacion]
         
-        # Si no es la primera posición, limpiar la anterior
-        if self.indice_animacion > 0:
-            posicion_anterior = self.camino_actual[self.indice_animacion - 1]
-            # Solo limpiar si no es obstáculo ni meta
-            if self.grid_data.get(posicion_anterior) not in [CellTypes.OBSTACLE, CellTypes.OBJECTIVE]:
-                self.temp_grid_data[posicion_anterior] = CellTypes.EMPTY
-        
-        # Colocar hormiga en nueva posición (si no es la meta)
-        if self.grid_data.get(posicion_actual) != CellTypes.OBJECTIVE:
+        if self.temp_grid_data.get(posicion_actual) != CellTypes.OBJECTIVE:
             self.temp_grid_data[posicion_actual] = CellTypes.ANT
+            
+            # Redraw only the current cell
+            row, col = posicion_actual
+            color = color_map[CellTypes.ANT]
+            rect = QGraphicsRectItem(col * self.cell_size, row * self.cell_size, self.cell_size, self.cell_size)
+            rect.setBrush(QBrush(color))
+            self.scene.addItem(rect)
         
-        # Redibujar
-        self.redraw_grid()
+        # Move the ant emoji to the new position
+        if self.ant_item:
+            self.ant_item.setPos(
+                posicion_actual[1] * self.cell_size + self.cell_size * 0.1,
+                posicion_actual[0] * self.cell_size - self.cell_size * 0.2
+            )
+            self.ant_item.setZValue(1)
         
         # Avanzar al siguiente paso
         self.indice_animacion += 1
